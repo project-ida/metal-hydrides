@@ -5,7 +5,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.16.6
+      jupytext_version: 1.17.1
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -20,9 +20,9 @@ jupyter:
 
 The purpose of this notebook is to create code that can simulate the initial stages of molecular hydrogen (or deuterium) gas being absorbed into a palladium lattice.
 
-The full details of this process are very complicated and so it's not the ambition of this first notebook to include all possible effects. The intention of this notebook is to balance physical realism with computational tractability with the ultimate goal to create compelling visualisations that make communicating the physics much easier.
+The full details of this process are very complicated and so it's not the ambition of this first notebook to include all possible effects. The intention of this notebook is to balance physical realism with computational tractability with the ultimate goal of creating compelling visualisations that make communicating the physics much easier.
 
-This simulation is part of a group of simulations designed to tackle different part of the hydrogen-palladium system. For example, another simulation deals with diffusion of atomic hydrogen within the palladium lattice. As such, we'll make use of data formats and functions that might seem overkill/sub-optimal for the gas simulation but they keep consistency across the group of simulations.
+This simulation is part of a group of simulations designed to tackle different parts of the hydrogen-palladium system. For example, another simulation deals with diffusion of atomic hydrogen within the palladium lattice. As such, we'll make use of data formats and functions that might seem overkill/sub-optimal for the gas simulation but they keep consistency across the group of simulations.
 
 
 ```python
@@ -406,7 +406,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
 plot_lattice(pd_positions)
 ```
 
-From the figure above, we can see a convenient simulation "box" above the surface ($-2<z<0$) for us to be moving the gas molecules around in. We'll create a function to automatically extract limits of the box.
+In the figure above, a lattice of Pd atoms is shown in the lower half with the top layer representing the surface. The space above the surface ($-2<z<0$) is a convenient simulation area for us to be moving the gas molecules around in. This simulation area is effectively a kind of "box" in which the gas molecules move -- and potentially bond with the Pd surface. We'll create a function to automatically extract limits of the box.
 
 ```python
 def calculate_gas_limits(lattice_positions, space_above_surface):
@@ -535,7 +535,7 @@ print(f"{total_volume} Å³")
 
 ```
 
-If we take the number density of air at standard temperature and pressure $n\approx 2.5\times 10^{25} \,  \rm m^{-3}$, then the number of molecules in the simulation box is going to be on the order of:
+If we take the average number density of air at standard temperature and pressure $n\approx 2.5\times 10^{25} \,  \rm m^{-3}$, then the average number of molecules in the simulation box is going to be on the order of:
 
 ```python
 2.5e25 * total_volume * 1e-30 # Convert Å^3 to m^3
@@ -543,11 +543,11 @@ If we take the number density of air at standard temperature and pressure $n\app
 
 We have less than a single particle in the simulation box at any one time. 
 
-This means that we don't need to take into account collisions between gas molecules.
+This means that, for the purpose of this simulation, we don't need to take into account collisions between gas molecules.
 
 It also means that we have to use some probability when generating the gas molecules. More specifically, when a gas molecule leaves the simulation box we should not immediately bring in a new one. We should instead wait for some time in order for the average density (over time) to approach a value consistent with the given temperature and pressure.
 
-Below is a function that generates gas molecule positions in such a probabilistic way. If a molecule is generated, it is positioned at the boundaries of the simulation box away from the lattice surface.
+Below is a function that generates gas molecule positions in such a probabilistic way. If a molecule enters the box (and thus is generated in the simulation), it is positioned at the boundaries of the simulation box away from the lattice surface.
 
 Because the lattice is defined in terms of crystal coordinates, we need to include the `cell_parameters` so that we can calculate volumes in terms of SI units.
 
@@ -670,7 +670,9 @@ for n in range(num_experiments):
 print(sum(number_mol)/len(number_mol))
 ```
 
-In 100 numerical "experiments" the function generates about 1.7 molecules for every 100 attempts - this is consistent with number densities of a gas at typical temperatures and pressures.
+In 100 numerical "experiments" the function generates about 1.7 molecules for every 100 attempts -- i.e. if we were to check on the box at random points in time, only every 100/1.7 = 59th time on average, we would see a molecule in it. This is consistent with number densities of a gas at typical temperatures and pressures.
+
+
 
 
 To continue the spirit of physical realism, we need to create particles with the correct distribution of velocities given a specific temperature. Each component of the velocity $v_x$, $v_y$, $v_z$ is distributed according to a Maxwell distribution:
@@ -786,7 +788,7 @@ $$\Delta t < \frac{1}{10}\frac{\rm box \, size}{v} \approx \frac{1}{10}\frac{2}{
 This $\Delta t$ will give us 10 points across the simulation box. That will probably make things look discontinuous, so we can opt for $\Delta t = 10^{-14}$ to make things smoother.
 
 
-We're also going to need a function to initialise the various gas properties for an arbitrary number of molecules. These properties will include the bond length and orientation of the molecule.
+We're also going to need a function to initialise the various gas properties for a given number of molecules such as bond length and orientation of the molecule.
 
 ```python
 def generate_gas_properties(num_particles, bond_length=0.19, theta=None, phi=None):
@@ -849,7 +851,7 @@ We've got everything required to initialise the gas particles. We now need to fi
 
 We'll create a function that returns the new position of a gas molecule if it's still "in play", and returns `None` if it's left the simulation box.
 
-It's worth noting that we'll use the term "atom" but we can also move a molecule by considering its centre of mass as a single atom.
+It's worth noting that we'll use the term "atom" but we can also move a molecule by considering its centre of mass as a point particle akin to a single atom.
 
 ```python
 def move_gas_atom(atom_position, atom_velocity, dt, gas_limits):
@@ -1016,9 +1018,9 @@ For a hydrogen molecule approaching a palladium surface, the type of adsorption 
 - the linear and rotational kinetic energy of the molecule
 - the coverage of hydrogen already on the surface
 
-At temperatures around 300K the "sticking probability" is about 75%  (see Fig 12 of [Lischka and Groß](https://webcf.waybackmachine.org/web/20240416071103/https://www.uni-ulm.de/fileadmin/website_uni_ulm/nawi.inst.250/publications/HPd_review.pdf)). This probability is reduced by rapid rotation because the molecule is not aligned for a sufficiently long time for sticking to occur. The reduction is not significant enough for us to consider as part of our first simulation because about 95% of the molecules have rotational states with quantum number $J\le 2$ (see Appendix) which don't show a significant reduction of sticking probability (see Fig. 3 of [ Groß et. al](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.75.2718)).
+At temperatures around 300K the "sticking probability" is about 75%  (see Fig 12 of [Lischka and Groß](https://webcf.waybackmachine.org/web/20240416071103/https://www.uni-ulm.de/fileadmin/website_uni_ulm/nawi.inst.250/publications/HPd_review.pdf)). This means that the chance is about 3 in 4 that a molecule sticks to the surface when it comes into a surface atoms 'sphere of influence' about which we'll say more later. This probability is reduced by rapid rotation because the molecule is not aligned for a sufficiently long time for sticking to occur. The reduction is not significant enough for us to consider as part of our first simulation because about 95% of the molecules have rotational states with quantum number $J\le 2$ (see Appendix) which don't show a significant reduction of sticking probability (see Fig. 3 of [ Groß et. al](https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.75.2718)).
 
-The interaction of $\rm Pd$ and $\rm H_2$ is a bit special because the attraction is strong enough to allow [dissociative adsorption](https://en.wikipedia.org/wiki/Dissociative_adsorption) in which the $\rm H_2$ molecule splits apart into atomic hydrogen which finds its way into specific spaces in between the surface palladium. This happens even in non-ideal conditions because at typical temperatures, the molecules are moving slowly enough so that they can be very efficiently "dynamically steered" towards a favorable configurations for dissociation.
+The interaction of $\rm Pd$ and $\rm H_2$ is a bit special because the attraction is strong enough to allow [dissociative adsorption](https://en.wikipedia.org/wiki/Dissociative_adsorption) in which the $\rm H_2$ molecule splits apart into atomic hydrogen which finds its way into specific spaces in between the surface palladium. This happens even in non-ideal conditions because at near-ambient temperatures, the molecules are moving slowly enough so that they can be very efficiently "dynamically steered" towards a favorable configuration for dissociation.
 
 For our lattice (visualised in birds eye view below), we are working with a specific crystallographic surface orientation that's known as as $\rm Pd(100)$. The final destination for the dissociated hydrogen atoms are the "hollow" sites and the "bridge" sites. Hollow sites are preferred because they are particularly stable positions and can be thought of as traps into which the hydrogen will largely stay stuck.
 
@@ -1029,7 +1031,10 @@ Later on (when the hollow sites are largely occupied) the bridge sites can becom
 
 
 
-<img src="https://zacros.org/images/tutorial_pics/tut005_fig01.png" alt="Pd(100) surface" width="600">
+<figure>
+  <img src="https://zacros.org/images/tutorial_pics/tut005_fig01.png" alt="Pd(100) surface" width="600">
+  <figcaption>Source: <a href="https://zacros.org/resources/tutorials/11-lattice-input-for-a-fcc-100-surface?start=1">Zacros Tutorial</a></figcaption>
+</figure>
 
 
 We'll focus our attention initially on the "atop" positions since these are the most attractive to a hydrogen molecule where they form a state that is closely related to the dihydrogen complex. We'll mock up a kind of manual dynamical steering in which a molecule is gradually aligned with the surface when it gets close enough. We'll do this with a linear interpolation.
@@ -1132,7 +1137,7 @@ def interpolate(current_position, current_properties, target_position, target_pr
 
 ```
 
-Now we'll create a function that checks to see whether a gas molecule should start adsorbing or not. This is based on how close the molecule is to the atop position and a 75% sticking probability (which we'll reduce for molecules note aligned with the surface). We'll need to not only check how close the gas molecule is to the surface but also keep track of which $\rm Pd$ atoms are already undergoing a bonding process with a molecule - we will make a molecule reflect off these so that we don't end up with two molecules trying to adsorb to the same surface $\rm Pd$.
+Now we'll create a function that checks to see whether a gas molecule should start adsorbing or not. This is based on how close the molecule is to the atop position and a 75% sticking probability (which assumes ideal orientation and which we'll reduce for molecules not aligned with the surface). We'll need to not only check how close the gas molecule is to the surface but also keep track of which $\rm Pd$ atoms are already undergoing a bonding process with a molecule - we will make a molecule reflect off these so that we don't end up with two molecules trying to adsorb to the same surface $\rm Pd$ which is not possible.
 
 ```python
 def adsorb_atop(atom_position, atom_velocity, atom_theta, surface_pd_atoms, bonding_pd_positions):
@@ -1552,7 +1557,7 @@ def calculate_dissociation_target(
 ## Simulation
 
 
-We're going to simulate $\rm H_2$ gas molecules adsorbing and dissociating on a $\rm Pd$ surface. We'll do this by moving around the centre of mass of the molecule and we'll keep track of the distance between each $\rm H$ atom (which we'll call the bond length) and the orientation of the molecule in order to allow us to visualise the individual atoms later on. We'll store all this information for each $\rm H_2$ molecule for time-step in arrays which will have names ending in `over_time`. For example, `h_gas_positions_over_time[0]` will give the positions of the centre of mass of the $\rm H_2$ molecule at the start of the simulation and `h_gas_positions_over_time[5]` will give the positions at time $5\Delta t$. We'll do the same for the $\rm Pd$ atoms for consistency even though strictly it's unnecessary because the atoms are unchanging over time.
+We're going to simulate $\rm H_2$ gas molecules adsorbing and dissociating on a $\rm Pd$ surface. We'll do this by moving around the centre of mass of the molecule. In order for us to simulate dissociation and also visualise the individual $\rm H$ atoms, we'll need to track of the distance between the $\rm H$ atoms (which we'll call the bond length) and the orientation of the molecule. We'll store all this information for each $\rm H_2$ molecule for time-step in arrays which will have names ending in `over_time`. For example, `h_gas_positions_over_time[0]` will give the positions of the centre of mass of the $\rm H_2$ molecule at the start of the simulation and `h_gas_positions_over_time[5]` will give the positions at time $5\Delta t$. We'll do the same for the $\rm Pd$ atoms for consistency even though strictly it's unnecessary because the atoms are unchanging over time (it will come in handy though when we consider other dynamics later).
 
 We will therefore need a function that will expand the centre of mass positions of $\rm H_2$ into the positions of the individual atoms.
 
@@ -1890,7 +1895,7 @@ def animate_lattice(atoms_over_time, bonds_over_time=None, elements=None, x_rang
 
 ```
 
-To test this out, we'll mock up a circular motion for the two molecules we visualsied earlier.
+To test this out, we'll mock up a circular motion for the two molecules we visualised earlier.
 
 ```python
 # Constants
@@ -1945,7 +1950,7 @@ for t in range(num_timesteps):
     h2_phi_over_time.append(phi)
 ```
 
-We can now expand the molecule into it's atoms, create the bonds and combine the hydrogen and palladium together into a single array for plotting.
+The previous block of code above simulates circular motion of the centre of mass of two molecules. In order to visualise the atoms and bonds, we have to expand the molecule into its atoms, create the bonds and combine the hydrogen and palladium together into a single array for plotting.
 
 ```python
 h_positions_over_time = expand_diatomic_positions(
@@ -1959,6 +1964,8 @@ bonds_over_time = create_bonds_over_time(h_positions_over_time)
 
 all_atoms_over_time = [Hs + Pds for Hs, Pds in zip(h_positions_over_time, pd_positions_over_time)]
 ```
+
+Below, we're going to run the animation a bit slower than the final that you'll see soon. We slow down the animation bt making a smaller `frame_time=5` - it's the physical time between each animation frame. Later we'll use `frame_time=20`.
 
 ```python
 animate_lattice(all_atoms_over_time, bonds_over_time,frame_time=5)
