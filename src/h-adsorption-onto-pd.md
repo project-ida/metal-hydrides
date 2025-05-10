@@ -12,20 +12,25 @@ jupyter:
     name: python3
 ---
 
+<!-- #region id="0b5e3b1b-2f84-4930-afad-5fc69eb5958b" -->
 <a href="https://colab.research.google.com/github/project-ida/metal-hydrides/blob/main/h-adsorption-onto-pd.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="https://nbviewer.org/github/project-ida/metal-hydrides/blob/main/h-adsorption-onto-pd.ipynb" target="_parent"><img src="https://nbviewer.org/static/img/nav_logo.svg" alt="Open In nbviewer" width="100"/></a>
+<!-- #endregion -->
 
-
+<!-- #region id="66ebd9e7-f830-42d4-a4e4-658eeca86660" -->
 # Hydrogen adsorption onto palladium
+<!-- #endregion -->
 
-
+<!-- #region id="fea0e520-9b10-4b2c-9489-01bcdf9dd5a3" -->
 The purpose of this notebook is to create code that can simulate the initial stages of molecular hydrogen (or deuterium) gas being absorbed into a palladium lattice.
 
 The full details of this process are very complicated and so it's not the ambition of this first notebook to include all possible effects. The intention of this notebook is to balance physical realism with computational tractability with the ultimate goal of creating compelling visualisations that make communicating the physics much easier.
 
+The notebook builds up step-by-step towards the full simulation that can be seen in the final animation at the bottom of the notebook (before the appendix).
+
 This simulation is part of a group of simulations designed to tackle different parts of the hydrogen-palladium system. For example, another simulation deals with diffusion of atomic hydrogen within the palladium lattice. As such, we'll make use of data formats and functions that might seem overkill/sub-optimal for the gas simulation but they keep consistency across the group of simulations.
+<!-- #endregion -->
 
-
-```python
+```python id="b07440e4-8a61-4a73-b629-8ef6833699f6"
 # RUN THIS IF YOU ARE USING GOOGLE COLAB
 import sys
 import os
@@ -35,7 +40,7 @@ sys.path.insert(0,'/content/metal-hydrides')
 os.chdir('/content/metal-hydrides')
 ```
 
-```python
+```python id="bac30ef6-5cbc-48b9-8efc-2228e6e2d1dc" outputId="e9a68161-1c4d-4c70-9eb1-962261779fff"
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -48,13 +53,15 @@ from plotly.offline import init_notebook_mode
 init_notebook_mode(connected=True)
 ```
 
-```python
+```python id="6cad0ecf-dd4d-4701-9103-0bdba9611cc4"
 dalton_to_kg = 1.66053906660e-27  # kg per amu
 ```
 
+<!-- #region id="916b20a0-6677-4269-bf2f-c3eaba68fd80" -->
 ## The lattice
+<!-- #endregion -->
 
-
+<!-- #region id="a1f4da30-e283-415e-b895-5835149c1d71" -->
 When a gas molecule gets close enough to a surface Pd atom, we're going to need to start "attaching" it in some way. This means that we need to have an awareness of the lattice atoms. We're also going to need to create a simulation "box" inside of which we're going to be moving the gas molecules around. This box depends on how big the lattice is - once again we need to know where the lattice atoms are.
 
 We've defined the lattice in a `.in` file whose structures is inspired by [Quantum Espresso's SCF input files](https://pranabdas.github.io/espresso/hands-on/scf). It needs a special function to read the data and output what we need. What's most important for this simulation is
@@ -62,11 +69,12 @@ We've defined the lattice in a `.in` file whose structures is inspired by [Quant
 - The size of a unit cell (in Å)
 
 > Note: when using crystal coordinates, each atomic position is specified as a fraction of the unit cell dimensions along the lattice vectors
+<!-- #endregion -->
 
-```python
+```python id="66c0c0c7-630b-4a8b-9488-9a74e2cf1dda"
 def parse_atomic_positions_and_identifiers(filename):
     """
-    Parses a file containing atomic structure data and extracts atomic positions, 
+    Parses a file containing atomic structure data and extracts atomic positions,
     cell parameters, atomic type identifiers, and bond information.
 
     The input file is expected to contain sections with specific headers:
@@ -75,7 +83,7 @@ def parse_atomic_positions_and_identifiers(filename):
     - `ATOMIC_TYPE_IDENTIFIERS`: Provides a mapping of atomic type indices to atomic species names.
     - `BONDS`: Defines bond information, with each bond represented by two sets of 3D coordinates.
 
-    Any lines starting with `#` or unrelated sections (e.g., `ATOMIC_SPECIES`) 
+    Any lines starting with `#` or unrelated sections (e.g., `ATOMIC_SPECIES`)
     are ignored during parsing.
 
     Args:
@@ -83,16 +91,16 @@ def parse_atomic_positions_and_identifiers(filename):
 
     Returns:
         tuple:
-            - `atomic_positions` (list of tuples): Each tuple contains an atomic label 
+            - `atomic_positions` (list of tuples): Each tuple contains an atomic label
               (str) and its fractional coordinates (x, y, z) as floats.
               Example: [("H", 0.0, 0.0, 0.0), ("O", 0.5, 0.5, 0.5)].
-            - `cell_parameters` (numpy.ndarray): A 3x3 array representing the lattice 
+            - `cell_parameters` (numpy.ndarray): A 3x3 array representing the lattice
               vectors of the unit cell in angstrom units.
               Example: [[a1, a2, a3], [b1, b2, b3], [c1, c2, c3]].
-            - `identifiers` (list of tuples): Each tuple contains an atomic type index 
+            - `identifiers` (list of tuples): Each tuple contains an atomic type index
               (int) and the corresponding atomic species name (str).
               Example: [(1, "H"), (2, "O")].
-            - `bonds` (list of lists): Each bond is represented as a list of two sets 
+            - `bonds` (list of lists): Each bond is represented as a list of two sets
               of 3D coordinates (start and end points) in angstrom units.
               Example: [[[x1, y1, z1], [x2, y2, z2]], ...].
 
@@ -106,7 +114,7 @@ def parse_atomic_positions_and_identifiers(filename):
     cell_parameters = []
     identifiers = []
     bonds = []
-    
+
     is_positions = False
     is_cell = False
     is_identifiers = False
@@ -145,7 +153,7 @@ def parse_atomic_positions_and_identifiers(filename):
         elif is_identifiers:
             parts = line.split()
             if len(parts) >= 2:
-                identifiers.append((int(parts[0]), parts[1])) 
+                identifiers.append((int(parts[0]), parts[1]))
         elif is_bonds:
             parts = line.split()
             if len(parts) == 6:
@@ -157,42 +165,52 @@ def parse_atomic_positions_and_identifiers(filename):
     return atomic_positions, np.array(cell_parameters), identifiers, bonds
 ```
 
-```python
+```python id="e1f04a5e-4733-481d-bbe4-2f395e269de9"
 pd_positions, cell_parameters, identifiers, bonds = parse_atomic_positions_and_identifiers("data/pd-100.in")
 ```
 
+<!-- #region id="d8472c64-2f8f-4f5b-a8a0-f9053b6c8a4b" -->
 Let's look at the first 10 atomic positions to get a sense of the format - remembering the units are "crystal coordinates".
+<!-- #endregion -->
 
-```python
+```python id="b1118c4b-9317-4342-b5e9-4c7e27bb21ea" outputId="94254928-c5d8-4211-9d44-653382de462d"
 print("\n".join(map(str, pd_positions[:10])))
 ```
 
+<!-- #region id="66ce2ff6-a598-4582-b88b-65158c338f3e" -->
 We can see the $\rm Pd$ lattice constant $a \approx 3.89 \, Å$ from the "cell parameters" that define the [conventional unit cell](https://en.wikipedia.org/wiki/Unit_cell#Conventional_cell).
+<!-- #endregion -->
 
-```python
+```python id="2833e4dc-95f6-487d-8fc2-fbbb5d595937" outputId="41e52f13-1c56-4868-bef2-8eb197e1c5be"
 print(cell_parameters)
 ```
 
+<!-- #region id="deeaf18e-bdef-4529-b498-163b66a42cf2" -->
 It's going to be helpful to be able to switch between angstroms and crystal coordinates so let's make a convenience function for this:
+<!-- #endregion -->
 
-```python
+```python id="781e8afd-b438-4eb8-82ec-71a3e55e5d78"
 def angstrom_to_crystal(length_angstrom, cell_parameters):
     cell_lengths = np.linalg.norm(cell_parameters, axis=0)
     length_crystal = length_angstrom / cell_lengths.mean()  # Assume isotropic cell
     return length_crystal
 ```
 
+<!-- #region id="52198a7e-987b-49ac-91a5-b24112e17569" -->
 Let's check it works by using the lattice constant $a \approx 3.89 \, Å$ and see if it returns 1.
+<!-- #endregion -->
 
-```python
+```python id="e5d70aa6-9882-4597-9a18-e217269de43b" outputId="37bcf0a3-b5dc-462d-a51b-7669827d304f"
 angstrom_to_crystal(3.89, cell_parameters)
 ```
 
-Now let's visualise the lattice in 3D. 
+<!-- #region id="a64ef857-e712-481b-a455-6bd6f76f812e" -->
+Now let's visualise the lattice in 3D.
 
 We're going to reverse the usual direction of the $z$-coordinate so that positive $z$ is moving into the lattice and negative $z$ is the space above the surface. The surface is defined at $z=0$.
+<!-- #endregion -->
 
-```python
+```python id="7bea6256-f1a0-427a-8852-e5e25a5c9ba6"
 def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.5), zlim=(2.5, -2.5), export=False, marker_color_map=None, marker_size_map=None):
     """
     Plot a 3D lattice of atomic positions with customised marker styles for specific atom types.
@@ -200,7 +218,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
     Parameters:
     ----------
     atom_positions : list of tuples
-        A list of atomic positions, where each element is a tuple of the form 
+        A list of atomic positions, where each element is a tuple of the form
         (atom_type, x, y, z). For example:
         [('Pd', 0.5, 0.5, 0.0), ('H', 1.0, 1.0, 1.0), ('O', 0.2, 0.2, 0.2)].
 
@@ -223,8 +241,8 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
         Default is (2.5, -2.5).
 
     export : bool, optional
-        If True, the plot is configured to autosize for exporting to an HTML file using 
-        `fig.write_html("filename.html")`. If False, the plot is displayed with fixed 
+        If True, the plot is configured to autosize for exporting to an HTML file using
+        `fig.write_html("filename.html")`. If False, the plot is displayed with fixed
         dimensions (900x700). Default is False.
 
     marker_color_map : dict, optional
@@ -240,7 +258,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
     Returns:
     -------
     fig : plotly.graph_objects.Figure
-        A Plotly 3D scatter plot showing the atomic lattice. Each atom type is plotted 
+        A Plotly 3D scatter plot showing the atomic lattice. Each atom type is plotted
         with customised marker size and color:
         - 'Pd': Marker size 6, color 'dimgrey'.
         - 'H': Marker size 3, color 'darkorange'.
@@ -248,9 +266,9 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
 
     Notes:
     -----
-    - The aspect ratio of the plot is automatically calculated based on the specified 
+    - The aspect ratio of the plot is automatically calculated based on the specified
       axis ranges to ensure proper visualisation.
-    - The function is designed to handle multiple atom types, grouping atoms by type 
+    - The function is designed to handle multiple atom types, grouping atoms by type
       and assigning unique styles based on predefined rules.
 
     Example:
@@ -265,7 +283,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
     """
 
     default_color = 'purple'  # Default color for markers
-    
+
     # Define the default color map for known atom types
     default_marker_color_map = {
         'Pd': 'dimgrey',
@@ -284,7 +302,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
         marker_color_map = default_marker_color_map
 
     default_size = 4  # Default size for markers
-    
+
     # Define the default size map for known atom types
     default_marker_size_map = {
         'Pd': 6,
@@ -301,7 +319,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
     else:
         # Use the default map if no user map is provided
         marker_size_map = default_marker_size_map
-        
+
 
     # Gather together data for different atom_types using "elements" (if provided) to generate lists
     # of data that will be plotted shortly
@@ -309,7 +327,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
     if elements is not None:
         for element in elements:
             atom_dict[element] = []
-            
+
     # Extract unique atom types if not provided in parameters. Then extract
     # their positions from lists of tuples like ('Pd', 0.5, 0.5, 0.0)
     for atom in atom_positions:
@@ -379,7 +397,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
                         )
                     )
         )
-        
+
     else:
         fig = go.Figure(
                 data=data,
@@ -396,19 +414,21 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
                     margin=dict(l=50, r=50, t=50, b=50)
                 )
         )
-      
+
 
     return fig
 
 ```
 
-```python
+```python id="32bd15cd-fa39-4486-92be-b60d2ce55690" outputId="9c5d39e3-64ce-4320-9047-ad6ebd52bdc8"
 plot_lattice(pd_positions)
 ```
 
+<!-- #region id="5eb5bf7b-1746-43fd-96b1-631dee031784" -->
 In the figure above, a lattice of Pd atoms is shown in the lower half with the top layer representing the surface. The space above the surface ($-2<z<0$) is a convenient simulation area for us to be moving the gas molecules around in. This simulation area is effectively a kind of "box" in which the gas molecules move -- and potentially bond with the Pd surface. We'll create a function to automatically extract limits of the box.
+<!-- #endregion -->
 
-```python
+```python id="edcee08b-524f-43e8-95aa-c2518295783d"
 def calculate_gas_limits(lattice_positions, space_above_surface):
     """
     Calculate the simulation box limits from lattice positions, incorporating a specified space above the surface.
@@ -416,13 +436,13 @@ def calculate_gas_limits(lattice_positions, space_above_surface):
     Parameters:
     ----------
     lattice_positions : list of tuples
-        A list of atomic positions, where each element is a tuple of the form 
+        A list of atomic positions, where each element is a tuple of the form
         (atom_type, x, y, z). For example:
         [('Pd', 0.5, 0.5, 0.0), ('H', 1.0, 1.0, 1.0), ('O', 0.2, 0.2, 0.2)].
 
     space_above_surface : float
-        The amount of space (in the same units as the coordinates) to include 
-        above the surface. This defines the lower limit of the z-axis in the 
+        The amount of space (in the same units as the coordinates) to include
+        above the surface. This defines the lower limit of the z-axis in the
         simulation box as `-space_above_surface`.
 
     Returns:
@@ -451,7 +471,7 @@ def calculate_gas_limits(lattice_positions, space_above_surface):
     x_coords = [x for _, x, _, _ in lattice_positions]
     y_coords = [y for _, _, y, _ in lattice_positions]
     z_coords = [z for _, _, _, z in lattice_positions]
-    
+
     x_min, x_max = min(x_coords), max(x_coords)
     y_min, y_max = min(y_coords), max(y_coords)
     z_min, z_max = min(z_coords), max(z_coords)
@@ -459,14 +479,16 @@ def calculate_gas_limits(lattice_positions, space_above_surface):
     return {'x': (x_min, x_max), 'y': (y_min, y_max), 'z': (-space_above_surface, z_min)}
 ```
 
-```python
+```python id="cdc16a17-6c36-48d5-a77b-fe60f66cd5ef" outputId="734df537-ae72-4fd8-a0ab-0cc1a3f17e71"
 gas_limits = calculate_gas_limits(pd_positions, 2.0)
 gas_limits
 ```
 
+<!-- #region id="8b567a43-54ef-49f8-9837-9c9019d4b8cd" -->
 We're going to need to be able to easily identify the surface atoms because these are the atoms that the gas molecules will interact with.
+<!-- #endregion -->
 
-```python
+```python id="ada3708d-cdc7-4aa1-8a1c-30cc7f0c4380"
 def extract_surface_atoms(lattice_positions, species=None):
     """
     Extract surface atoms from a list of atomic positions, optionally filtering by atom species.
@@ -474,19 +496,19 @@ def extract_surface_atoms(lattice_positions, species=None):
     Parameters:
     ----------
     lattice_positions : list of tuples
-        A list of atomic positions, where each element is a tuple of the form 
+        A list of atomic positions, where each element is a tuple of the form
         (atom_type, x, y, z). For example:
         [('Pd', 0.5, 0.5, 0.0), ('H', 1.0, 1.0, 1.0), ('O', 0.2, 0.2, 0.0)].
 
     species : str, optional
-        The label of the atomic species to filter by (e.g., 'Pd'). If not specified, 
+        The label of the atomic species to filter by (e.g., 'Pd'). If not specified,
         all atom types at z=0.0 are returned.
 
     Returns:
     -------
     surface_atoms : list of tuples
-        A list of atoms that are located on the surface, identified by their 
-        z-coordinate being exactly 0.0. If a species is specified, only atoms of 
+        A list of atoms that are located on the surface, identified by their
+        z-coordinate being exactly 0.0. If a species is specified, only atoms of
         that type are included. Each element is a tuple of the form (atom_type, x, y, z).
 
     Example:
@@ -512,20 +534,23 @@ def extract_surface_atoms(lattice_positions, species=None):
 
 ```
 
-```python
+```python id="bd7850ef-ed7f-4f1c-9b49-4b31fb2a60c7"
 surface_pd_atoms = extract_surface_atoms(pd_positions, "Pd")
 ```
 
-```python
+```python id="f0110c96-4b1e-4ca4-afca-c949c312cf94" outputId="e77d2e9c-833a-4005-8b2e-ab5cfa1ead83"
 plot_lattice(surface_pd_atoms)
 ```
 
+<!-- #region id="22853416-5ca0-491b-97d6-e73f6adbcece" -->
 ## The gas
+<!-- #endregion -->
 
-
+<!-- #region id="4a0cfddc-9cc9-4dca-b12b-13603a08d3ed" -->
 How many gas molecules are going to be present in the simulation box? We first need to get the volume of the box.
+<!-- #endregion -->
 
-```python
+```python id="13f1b778-82dc-4978-9a36-63ce0a6be239" outputId="62e9f772-9ddb-4883-d246-d7e21cb2635e"
 cell_volume = np.abs(np.linalg.det(cell_parameters))
 num_cells_x = gas_limits['x'][1] - gas_limits['x'][0]
 num_cells_y = gas_limits['y'][1] - gas_limits['y'][0]
@@ -535,13 +560,16 @@ print(f"{total_volume} Å³")
 
 ```
 
+<!-- #region id="0241c517-7f01-48dd-9b2d-96378520c0d6" -->
 If we take the average number density of air at standard temperature and pressure $n\approx 2.5\times 10^{25} \,  \rm m^{-3}$, then the average number of molecules in the simulation box is going to be on the order of:
+<!-- #endregion -->
 
-```python
+```python id="9d48d7a5-bc9b-422d-85dd-5b896f347df0" outputId="aedcd01f-f08b-4c84-e2a4-dff373678a68"
 2.5e25 * total_volume * 1e-30 # Convert Å^3 to m^3
 ```
 
-We have less than a single particle in the simulation box at any one time. 
+<!-- #region id="3732069d-268c-431b-a7a8-0cc7d9fb5874" -->
+We have less than a single particle in the simulation box at any one time.
 
 This means that, for the purpose of this simulation, we don't need to take into account collisions between gas molecules.
 
@@ -550,8 +578,9 @@ It also means that we have to use some probability when generating the gas molec
 Below is a function that generates gas molecule positions in such a probabilistic way. If a molecule enters the box (and thus is generated in the simulation), it is positioned at the boundaries of the simulation box away from the lattice surface.
 
 Because the lattice is defined in terms of crystal coordinates, we need to include the `cell_parameters` so that we can calculate volumes in terms of SI units.
+<!-- #endregion -->
 
-```python
+```python id="fc407b80-90b4-4406-928d-d1c9cca7dd65"
 def generate_gas_positions(gas_pressure, gas_temperature, gas_limits, cell_parameters, species="H", particle_mass=None):
     """
     Generate initial gas particle positions based on pressure, temperature, and gas limits.
@@ -596,7 +625,7 @@ def generate_gas_positions(gas_pressure, gas_temperature, gas_limits, cell_param
     >>> print(gas_positions)
     [('H', 1.234, 0.567, -5.0), ('H', 2.0, 1.123, -2.5), ...]
     """
-    
+
     k_B = 1.38e-23  # Boltzmann constant in J/K
     dalton_to_kg = 1.66053906660e-27  # kg per amu
     if not particle_mass:
@@ -650,9 +679,11 @@ def generate_gas_positions(gas_pressure, gas_temperature, gas_limits, cell_param
     return positions
 ```
 
+<!-- #region id="4540e141-5232-4ff3-bc0a-492d657363e5" -->
 Let's check how often the function will actually generate a gas molecules
+<!-- #endregion -->
 
-```python
+```python id="33434cb7-9627-49b4-8825-a58474d59b4b" outputId="8e7417ba-21fc-4a40-ca0d-ae62cfca5cdc"
 number_mol = []
 num_experiments = 1000
 pressure  = 1 # bar
@@ -666,15 +697,17 @@ for n in range(num_experiments):
         if len(gas_atoms) != 0:
             tot+=1
     number_mol.append(tot)
-    
+
 print(sum(number_mol)/len(number_mol))
 ```
 
+<!-- #region id="77c3f644-8c14-4000-a476-016a70645a4b" -->
 In 100 numerical "experiments" the function generates about 1.7 molecules for every 100 attempts -- i.e. if we were to check on the box at random points in time, only every 100/1.7 = 59th time on average, we would see a molecule in it. This is consistent with number densities of a gas at typical temperatures and pressures.
 
 
+<!-- #endregion -->
 
-
+<!-- #region id="927079dc-56ec-4e48-9cf4-90c98cbb5587" -->
 To continue the spirit of physical realism, we need to create particles with the correct distribution of velocities given a specific temperature. Each component of the velocity $v_x$, $v_y$, $v_z$ is distributed according to a Maxwell distribution:
 
 $$f(v_i) = {\sqrt {\frac {m}{2\pi k_{\text{B}}T}}}\,\exp \left(-{\frac {mv_{i}^{2}}{2k_{\text{B}}T}}\right)$$
@@ -684,19 +717,20 @@ This is just a standard normal distribution with a standard deviation of:
 $$\sigma = \sqrt{\frac{k_B T}{m}}$$
 
 Let's create a function that samples such a normal distribution.
+<!-- #endregion -->
 
-```python
+```python id="488a1452-8808-40fa-a1f5-060c3017dc1b"
 def generate_gas_velocities(num_particles, gas_temperature, cell_parameters, species="H", particle_mass=None):
     """
     Generate initial gas particle velocities based on the Maxwell distrubution and convert to crystal units,
     ensuring that vz is always positive so that the gas molecule is always heading to the lattice
     surface at z=0.
-    
+
     Parameters:
     ----------
     num_particles : int
         The number of gas particles for which velocities need to be generated.
-        
+
     gas_temperature : float
         The temperature of the gas in Celsius.
 
@@ -726,7 +760,7 @@ def generate_gas_velocities(num_particles, gas_temperature, cell_parameters, spe
     >>> print(velocities)
     [(0.123, 0.456, 0.789), (-0.321, 0.654, 0.987), ...]
     """
-    
+
     k_B = 1.38e-23  # Boltzmann constant in J/K
     dalton_to_kg = 1.66053906660e-27  # kg per amu
     if not particle_mass:
@@ -764,9 +798,11 @@ def generate_gas_velocities(num_particles, gas_temperature, cell_parameters, spe
     return velocities
 ```
 
+<!-- #region id="58365c4b-4588-454f-9f8b-6e66caa76dc7" -->
 We're ultimately going to work with deuterium so let's check how fast $\rm D_2$ gas molecules at 25 C are moving. We'll sample 1000 velocities and see what the average is.
+<!-- #endregion -->
 
-```python
+```python id="1e3ec367-dde4-4782-bce6-6cf61beb5bde" outputId="0195963a-93bd-48bf-ebc3-2f5b526e63e3"
 temperature = 25 # C
 D2_mass = chemical_formula("D2").mass*dalton_to_kg
 number_of_velocies = 1000
@@ -777,6 +813,7 @@ average_speed = np.mean(speeds)
 average_speed/1e12
 ```
 
+<!-- #region id="d9550649-6edc-4ebd-9d74-b0b0f7192fbe" -->
 Generating 1000 velocities gives us an astonishing average speed of about 3 trillion crystal units per second!
 
 It might seem like we've done something wrong but we haven't. The normal speed of molecules in air is $v_{\rm air} \approx 1.5 \, \rm km /s$ - gas molecules move very fast.
@@ -786,11 +823,13 @@ The gas speed and the size of the the simulation box is going to give us a sensi
 $$\Delta t < \frac{1}{10}\frac{\rm box \, size}{v} \approx \frac{1}{10}\frac{2}{3\times 10^{12}} \approx 7\times 10^{-14} \, \rm s $$
 
 This $\Delta t$ will give us 10 points across the simulation box. That will probably make things look discontinuous, so we can opt for $\Delta t = 10^{-14}$ to make things smoother.
+<!-- #endregion -->
 
-
+<!-- #region id="00755396-e8a5-46a4-8714-3f8eaf6dabb6" -->
 We're also going to need a function to initialise the various gas properties for a given number of molecules such as bond length and orientation of the molecule.
+<!-- #endregion -->
 
-```python
+```python id="71041486-e7a1-4f12-b4e2-aa4d8b406707"
 def generate_gas_properties(num_particles, bond_length=0.19, theta=None, phi=None):
     """
     Generate an array of dictionaries containing gas properties for a number of molecules.
@@ -844,6 +883,7 @@ def generate_gas_properties(num_particles, bond_length=0.19, theta=None, phi=Non
 
 ```
 
+<!-- #region id="d686b900-d4de-4e39-a155-f52607232d01" -->
 We've got everything required to initialise the gas particles. We now need to figure out how to move them. This will involve:
 - Updating the molecule's position based on it's velocity according to e.g. $x_{\rm new} = x_{\rm old} + v_x\Delta t$
 - Removing a molecule when it moves out of the simulation box
@@ -852,24 +892,25 @@ We've got everything required to initialise the gas particles. We now need to fi
 We'll create a function that returns the new position of a gas molecule if it's still "in play", and returns `None` if it's left the simulation box.
 
 It's worth noting that we'll use the term "atom" but we can also move a molecule by considering its centre of mass as a point particle akin to a single atom.
+<!-- #endregion -->
 
-```python
+```python id="750e47f2-0b53-4a43-b386-5df670441ec6"
 def move_gas_atom(atom_position, atom_velocity, dt, gas_limits):
     """
-    Move a gas atom based on its current position, velocity, and time step, 
+    Move a gas atom based on its current position, velocity, and time step,
     and perform boundary checks with reflection for particles reaching the lattice surface (the upper z-limit).
-    
+
     Parameters:
     ----------
     atom_position : tuple
         The current position of the atom in the format ('H', x, y, z), where:
         - 'H' represents the atom type.
         - x, y, z are the spatial coordinates in crystal units.
-    
+
     atom_velocity : tuple
         The current velocity of the atom in the format (vx, vy, vz), where:
         - vx, vy, vz are the velocity components in crystal units per second.
-    
+
     dt : float
         The time step for the movement in seconds.
 
@@ -878,7 +919,7 @@ def move_gas_atom(atom_position, atom_velocity, dt, gas_limits):
         - "x": Tuple (min_x, max_x) for x-axis limits.
         - "y": Tuple (min_y, max_y) for y-axis limits.
         - "z": Tuple (min_z, max_z) for z-axis limits.
-    
+
     Returns:
     -------
     tuple
@@ -934,16 +975,19 @@ def move_gas_atom(atom_position, atom_velocity, dt, gas_limits):
 
 ```
 
+<!-- #region id="d31ee364-9d4e-40b0-9979-d18309e8327f" -->
 ## Bonding
+<!-- #endregion -->
 
-
+<!-- #region id="b9c523e3-f8f1-4ec6-8b1f-f9212cef804c" -->
 In general, the interaction of hydrogen with palladium is complicated. A good review is [Lischka and Groß - Hydrogen on palladium: A model
 system for the interaction of atoms
 and molecules with metal surfaces](https://webcf.waybackmachine.org/web/20240416071103/https://www.uni-ulm.de/fileadmin/website_uni_ulm/nawi.inst.250/publications/HPd_review.pdf) which details extensively what is summarised below.
 
 An individual hydrogen molecule can form a chemical bond with an individual palladium atom - producing a so called dihydrogen complex. The result is a Pd-H bond length of 1.67 Å and a lengthening of the molecular H-H bond length from 0.74 Å to 0.864 Å. A visual comparison of these lengths is presented (to scale) below.
+<!-- #endregion -->
 
-```python
+```python id="791747b2-7daa-4006-ac71-fd6318f6b37d" outputId="4227afbb-024b-45ec-8d54-99e8be0e908f"
 def draw_bond(ax, pos1, pos2, color='silver', width=2):
     """Draw a bond between two points."""
     ax.plot(
@@ -964,8 +1008,8 @@ def annotate_bond(ax, pos1, pos2, bond_length, color='black'):
 # Define atomic positions
 positions_h2 = [(0, -0.75), (0.74, -0.75)]  # H2 molecule (H-H bond = 0.74 Å)
 positions_h2_pd = [
-    (0, 0), 
-    (0.864, 0), 
+    (0, 0),
+    (0.864, 0),
     (0.432, np.sqrt(1.67**2 - 0.432**2))  # H2-Pd complex (Pd at y ≈ 1.61)
 ]
 
@@ -1008,6 +1052,7 @@ plt.tight_layout()
 plt.show()
 ```
 
+<!-- #region id="eb325b8c-bb6a-4469-ab9a-a62c8bd72e37" -->
 When a hydrogen molecule approaches a palladium surface, however, the situation is more involved. For example, some molecules will actually be repelled by the surface if their $\rm H_2$ bond is not aligned with the surface or they have too much rotational energy.
 
 For those molecules that are not repelled, the first thing that happens is a process called ["adsorption"](https://en.wikipedia.org/wiki/Adsorption) which is just a fancy way of saying a particle sticks to the surface of something. Adsorption can involve new chemical bonds being formed (as in [chemisorption](https://en.wikipedia.org/wiki/Chemisorption)) but it can also involve less change to the atoms and molecules (as in [physisorption](https://en.wikipedia.org/wiki/Physisorption)).
@@ -1029,21 +1074,24 @@ Later on (when the hollow sites are largely occupied) the bridge sites can becom
 
 
 
+<!-- #endregion -->
 
-
+<!-- #region id="999b05a0-9b71-434b-b618-4d6c0f8ec085" -->
 <figure>
   <img src="https://zacros.org/images/tutorial_pics/tut005_fig01.png" alt="Pd(100) surface" width="600">
   <figcaption>Source: <a href="https://zacros.org/resources/tutorials/11-lattice-input-for-a-fcc-100-surface?start=1">Zacros Tutorial</a></figcaption>
 </figure>
+<!-- #endregion -->
 
-
+<!-- #region id="c802414f-ed35-4168-9340-0bccb63b3cfd" -->
 We'll focus our attention initially on the "atop" positions since these are the most attractive to a hydrogen molecule where they form a state that is closely related to the dihydrogen complex. We'll mock up a kind of manual dynamical steering in which a molecule is gradually aligned with the surface when it gets close enough. We'll do this with a linear interpolation.
 
 Once the molecule is at the atop position, we then need capture the fact that this configuration is not stable. The $\rm H_2$ molecule will ultimately dissociate because it can still reduce its energy by moving its center of mass laterally away from the on-top position - in a sense sliding off the top of the $\rm Pd$ atom and towards the more energetically favourable hollow and bridge sites. We'll also mock up the dissociation motion using linear interpolation.
 
 Let's create the interpolation function.
+<!-- #endregion -->
 
-```python
+```python id="7ad1b655-993a-4f09-95b5-4215a61c43c5"
 def interpolate(current_position, current_properties, target_position, target_properties, damping_factor=0.1, threshold=0.01):
     """
     Interpolate the position and properties of a molecule toward a target position and properties.
@@ -1137,9 +1185,11 @@ def interpolate(current_position, current_properties, target_position, target_pr
 
 ```
 
+<!-- #region id="e969755e-be82-40b4-9a6e-18ea5a1fa838" -->
 Now we'll create a function that checks to see whether a gas molecule should start adsorbing or not. This is based on how close the molecule is to the atop position and a 75% sticking probability (which assumes ideal orientation and which we'll reduce for molecules not aligned with the surface). We'll need to not only check how close the gas molecule is to the surface but also keep track of which $\rm Pd$ atoms are already undergoing a bonding process with a molecule - we will make a molecule reflect off these so that we don't end up with two molecules trying to adsorb to the same surface $\rm Pd$ which is not possible.
+<!-- #endregion -->
 
-```python
+```python id="81552394-3751-460e-a240-dc8bd2ddc3dc"
 def adsorb_atop(atom_position, atom_velocity, atom_theta, surface_pd_atoms, bonding_pd_positions):
     """
     Determine if a gas atom should start adsorbing with or reflect off a Pd surface atom based on proximity and orientation.
@@ -1214,9 +1264,11 @@ def adsorb_atop(atom_position, atom_velocity, atom_theta, surface_pd_atoms, bond
 
 ```
 
+<!-- #region id="680ec933-9e84-4bcb-8f59-36e096d6ddb1" -->
 After the molecule gets adsorbed, we'll start the dissociation process. For this, we need to be able to to identify the bridge and hollow sites.
+<!-- #endregion -->
 
-```python
+```python id="c3d5add6-53ed-4bf7-9c44-832809af6267"
 def identify_bridge_and_hollow_sites(surface_pd_atoms):
     """
     Identify bridge and hollow sites on an FCC (100) surface without duplicates.
@@ -1266,20 +1318,24 @@ def identify_bridge_and_hollow_sites(surface_pd_atoms):
 
 ```
 
+<!-- #region id="85b79194-a60f-49d5-b563-8ec1219ddb4f" -->
 Let's check it works
+<!-- #endregion -->
 
-```python
+```python id="d23735db-0dd7-4b33-b2c1-6b2e60f19a00" outputId="0e896133-4c0f-49c7-9794-09111e5fdcf9"
 bridge_sites, hollow_sites = identify_bridge_and_hollow_sites(surface_pd_atoms)
 plot_lattice(surface_pd_atoms+bridge_sites+hollow_sites, marker_color_map={"Bridge":"orange", "Hollow":"red"})
 ```
 
+<!-- #region id="af9044dc-e809-4ce3-b814-ae77517bfb33" -->
 We're going to need to have ways of easily finding the bridge sites and the hollow sites, so we will create some dictionaries:
 - `atom_to_bridges` - returns the bridges associated with an atom
 - `bridge_to_atoms` - returns the atoms neighbouring a bridge
 - `bridge_to_hollows` - returns the hollows neighbouring a bridge
 - `hollow_to_bridge` - returns the bridges neighbouring a hollow
+<!-- #endregion -->
 
-```python
+```python id="17d70173-a54c-4984-bd56-f95b1271b0ae"
 def construct_site_dictionaries(surface_pd_atoms, bridge_sites, hollow_sites):
     """
     Construct dictionaries mapping Pd atoms to bridge sites (and the reverse), bridge sites to hollow sites (and the reverse).
@@ -1310,7 +1366,7 @@ def construct_site_dictionaries(surface_pd_atoms, bridge_sites, hollow_sites):
 
     # Lattice constant in crystal units
     lattice_constant = 1  # (crystal units)
-    atom_to_bridge_distance =  np.sqrt(2*lattice_constant**2) / 4  # Distance from atom to bridge 
+    atom_to_bridge_distance =  np.sqrt(2*lattice_constant**2) / 4  # Distance from atom to bridge
     bridge_to_hollow_distance = np.sqrt(2*lattice_constant**2) / 4  # Distance from atom to hollow
 
     pd_positions = [np.array(pos[1:]) for pos in surface_pd_atoms]
@@ -1355,34 +1411,38 @@ def construct_site_dictionaries(surface_pd_atoms, bridge_sites, hollow_sites):
         ]
         hollow_to_bridges[hollow] = bridges
 
-    return atom_to_bridges, bridge_to_atoms, bridge_to_hollows, hollow_to_bridges, 
+    return atom_to_bridges, bridge_to_atoms, bridge_to_hollows, hollow_to_bridges,
 
 ```
 
+<!-- #region id="74b7fea6-71ec-4ca1-bd5b-d4383b9859f2" -->
 Let's check it works.
+<!-- #endregion -->
 
-```python
+```python id="b41fa29e-d583-4063-99b2-2fc7fd48cc9a"
 atom_to_bridges, bridge_to_atoms, bridge_to_hollows, hollow_to_bridges = construct_site_dictionaries(surface_pd_atoms, bridge_sites, hollow_sites)
 ```
 
-```python
+```python id="a1690080-dcdc-44e4-9084-8c903b89f272" outputId="c6df2ef4-45b1-4537-bf0f-046e24830857"
 plot_lattice(surface_pd_atoms + atom_to_bridges[('Pd', 0.5, 0.5, 0.0)] + atom_to_bridges[('Pd', 2.0, 3.0, 0.0)] +
              atom_to_bridges[('Pd', 2.0, 1.0, 0.0)], marker_color_map={"Bridge":"orange"})
 ```
 
-```python
+```python id="8ed065fd-6077-4bad-bfb9-17a7cb68e732" outputId="7a6f1ff2-5e3b-41bb-a60b-147eae8efaeb"
 plot_lattice(surface_pd_atoms  + atom_to_bridges[('Pd', 2.0, 3.0, 0.0)] + bridge_to_hollows[atom_to_bridges[('Pd', 2.0, 3.0, 0.0)][0]]
              +[atom_to_bridges[('Pd', 1.0, 1.0, 0.0)][0]] + bridge_to_hollows[atom_to_bridges[('Pd', 1.0, 1.0, 0.0)][0]], marker_color_map={"Bridge":"orange", "Hollow":"red"})
 ```
 
-The most tricky bit now is to figure out where a $\rm H_2$ molecule should dissociate to once it's finished adsorbing to a surface $\rm Pd$. Hollows come first, followed by bridges and once they are filled then no dissociation can occur. In order to prevent multiple occupation of a given site, we have to keep track of what's already been occupied. It's a bit tricky because atoms share bridges and bridges share hollows. 
+<!-- #region id="37b20a5b-0cf4-42e0-8e59-da416544b504" -->
+The most tricky bit now is to figure out where a $\rm H_2$ molecule should dissociate to once it's finished adsorbing to a surface $\rm Pd$. Hollows come first, followed by bridges and once they are filled then no dissociation can occur. In order to prevent multiple occupation of a given site, we have to keep track of what's already been occupied. It's a bit tricky because atoms share bridges and bridges share hollows.
+<!-- #endregion -->
 
-```python
+```python id="8bbea161-a7ec-46e0-b734-e4bfb8fb9eb5"
 def calculate_dissociation_target(
-    pd_atom, 
+    pd_atom,
     atom_to_bridges,
     bridge_to_atoms,
-    bridge_to_hollows, 
+    bridge_to_hollows,
     hollow_to_bridges,
     species="H2"
 ):
@@ -1472,17 +1532,17 @@ def calculate_dissociation_target(
 
         target_position = (species, *np.array(selected_bridge[1:]))
 
-        # Now we need to remove the bridge sites around the two hollows so that no other 
+        # Now we need to remove the bridge sites around the two hollows so that no other
         # molecule will be able to move to those bridges and dissociate to the two hollow sites
         for hollow in hollow_sites:
             # Get the bridge sites associated with this hollow
             neighboring_bridges = hollow_to_bridges[hollow]
-    
+
             # Remove these neighboring bridges from bridge_to_hollows
             for neighboring_bridge in neighboring_bridges:
                 if neighboring_bridge in bridge_to_hollows:
                     del bridge_to_hollows[neighboring_bridge]
-        
+
         break
 
     if selected_bridge is None:
@@ -1496,42 +1556,42 @@ def calculate_dissociation_target(
             # Take the first two bridge sites (remember they are randomly shuffled at the start)
             selected_bridge_sites = bridge_sites[:2]
             selected_bridge_coordinates = [np.array(bridge[1:]) for bridge in selected_bridge_sites]
-    
+
             # Calculate the bond length as the distance between the two bridge sites
             bond_length = np.linalg.norm(selected_bridge_coordinates[0] - selected_bridge_coordinates[1])
 
             # target is midpoint between the bridge points
-            midpoint = tuple((selected_bridge_coordinates[0] + selected_bridge_coordinates[1]) / 2) 
+            midpoint = tuple((selected_bridge_coordinates[0] + selected_bridge_coordinates[1]) / 2)
             target_position = (species, *midpoint)
-    
+
             # Determine the direction of the bond (phi angle)
             dx, dy = selected_bridge_coordinates[0][0] - selected_bridge_coordinates[1][0], selected_bridge_coordinates[0][1] - selected_bridge_coordinates[1][1]
             phi = np.arctan2(dy, dx)
-    
+
             target_properties = {
                 "bond_length": bond_length,
                 "theta": np.pi / 2,
                 "phi": phi
             }
 
-    
+
             # Now we need to remove the atom site so that no other molecule will be able to use them
             if selected_bridge in bridge_to_atoms:
                 # Get the Pd atom sites neighbouring to this bridge
                 neighboring_atoms = bridge_to_atoms[selected_bridge]
-                
+
                 # Remove these neighboring atoms from atom_to_bridges to mark them as unavailable
                 for atom in neighboring_atoms:
                     if atom in atom_to_bridges:
                         # Remove the selected bridge from the atom's list of bridges
                         if selected_bridge in atom_to_bridges[atom]:
                             atom_to_bridges[atom].remove(selected_bridge)
-                        
+
                         # If the atom has no more bridges available, remove the atom from the dictionary
                         if not atom_to_bridges[atom]:
                             del atom_to_bridges[atom]
-    
-            # Now we need to remove the bridge sites from all atoms so that that no other 
+
+            # Now we need to remove the bridge sites from all atoms so that that no other
             # molecules will be able to dissociate into those bridge sites
             for bridge in selected_bridge_sites:
                 # Get the atom sites associated with this bridge (there will be two)
@@ -1540,7 +1600,7 @@ def calculate_dissociation_target(
                     # Remove the selected bridge from the atom's list of bridges
                     if bridge in atom_to_bridges[neighboring_atom]:
                         atom_to_bridges[neighboring_atom].remove(bridge)
-                    
+
                     # If the atom has no more bridges available, remove the atom from the dictionary
                     if not atom_to_bridges[neighboring_atom]:
                         del atom_to_bridges[neighboring_atom]
@@ -1554,14 +1614,17 @@ def calculate_dissociation_target(
 
 ```
 
+<!-- #region id="bccc1798-191c-4193-9dd8-e22c951744e5" -->
 ## Simulation
+<!-- #endregion -->
 
-
+<!-- #region id="893e5fd3-6b7d-4ddd-b9c7-54abcafdca3c" -->
 We're going to simulate $\rm H_2$ gas molecules adsorbing and dissociating on a $\rm Pd$ surface. We'll do this by moving around the centre of mass of the molecule. In order for us to simulate dissociation and also visualise the individual $\rm H$ atoms, we'll need to track of the distance between the $\rm H$ atoms (which we'll call the bond length) and the orientation of the molecule. We'll store all this information for each $\rm H_2$ molecule for time-step in arrays which will have names ending in `over_time`. For example, `h_gas_positions_over_time[0]` will give the positions of the centre of mass of the $\rm H_2$ molecule at the start of the simulation and `h_gas_positions_over_time[5]` will give the positions at time $5\Delta t$. We'll do the same for the $\rm Pd$ atoms for consistency even though strictly it's unnecessary because the atoms are unchanging over time (it will come in handy though when we consider other dynamics later).
 
 We will therefore need a function that will expand the centre of mass positions of $\rm H_2$ into the positions of the individual atoms.
+<!-- #endregion -->
 
-```python
+```python id="dd9865ac-bfe2-4c72-9c2b-a950eb28337e"
 def expand_diatomic_positions(
     diatomic_positions_over_time,
     bond_lengths_over_time,
@@ -1570,7 +1633,7 @@ def expand_diatomic_positions(
     z_threshold=1e-6
 ):
     """
-    Expand diatomic molecule centre of mass positions into individual atomic positions, 
+    Expand diatomic molecule centre of mass positions into individual atomic positions,
     considering bond lengths and 3D orientations. Small `z` values are set to zero if below a threshold to avoid visulisation issues.
 
     Parameters:
@@ -1648,9 +1711,11 @@ def expand_diatomic_positions(
 
 ```
 
+<!-- #region id="a23881b8-8d81-4085-bb6b-833662c7b1f9" -->
 Let's try this out with a couple of molecules with different orientations
+<!-- #endregion -->
 
-```python
+```python id="a7b59bb8-62a7-4ff7-b73f-8deb370ffa47"
 # two molecules at t=0
 h2_positions_over_time = [[("H2",1,1,-1), ("H2",2,2,-1.5)]]
 h2_bond_lengths_over_time = [[angstrom_to_crystal(0.74, cell_parameters), angstrom_to_crystal(0.74, cell_parameters)]]
@@ -1661,23 +1726,27 @@ h2_phi_over_time = [[0, np.pi/2]] # 0 is alined along x, pi/2 is aligned along y
 h_positions_over_time = expand_diatomic_positions(h2_positions_over_time, h2_bond_lengths_over_time, h2_theta_over_time, h2_phi_over_time)
 ```
 
+<!-- #region id="11672218-28e5-4fbf-a102-cf09697414b1" -->
 We can plot this using `plot_lattice` by just taking the first element of the `expand_h_positions_over_time` array
+<!-- #endregion -->
 
-```python
+```python id="0b516596-95d5-4beb-ad7e-ecc278829b88" outputId="840f2ca0-1afd-4f17-dbf2-55591638a8ec"
 fig = plot_lattice(surface_pd_atoms + h_positions_over_time[0])
 fig.show()
 ```
 
+<!-- #region id="1eef874b-8841-4202-a1e6-f14498c691c1" -->
 We'd like to be able to draw bonds between the atoms. For this we'll create a separate array to store start and end points for the bond. We create a separate array instead of just using the expanded $\rm H$ positions because sometimes we'll not want to visualise a bond e.g. when the molecule has dissociated.
+<!-- #endregion -->
 
-```python
+```python id="bb300c2d-3bbc-4ee6-9d76-3779bbe63347"
 def create_bonds_over_time(expanded_positions_over_time):
     """
     Create bonds over time from expanded diatomic positions.
 
     Parameters:
         expanded_positions_over_time (list): List of lists of expanded H atom positions from expand_diatomic_positions function.
-    
+
     Returns:
         bonds_over_time (list): List of lists of bonds at each time index. Each bond is a list [position_1, position_2].
     """
@@ -1697,13 +1766,15 @@ def create_bonds_over_time(expanded_positions_over_time):
 
 ```
 
-```python
+```python id="5a834791-7477-412d-b035-bfe42ac532a6"
 bonds_over_time = create_bonds_over_time(h_positions_over_time)
 ```
 
+<!-- #region id="3e811974-d6e6-4052-8cb0-0ea7b8c0847f" -->
 For visualisating the bonds, we can take an existing figure made by `plot_lattice` and add to it.
+<!-- #endregion -->
 
-```python
+```python id="a37b1231-0657-4c3f-adff-6feff01662c5"
 def add_bonds_to_figure(fig, bonds, bond_color='green', bond_width=2):
     """
     Add bonds to an existing Plotly figure.
@@ -1767,13 +1838,15 @@ def add_bonds_to_figure(fig, bonds, bond_color='green', bond_width=2):
 
 ```
 
-```python
+```python id="95675a0a-139a-42d8-8e39-01abd666fc91" outputId="cee1c4b0-21a3-4f3d-c919-a29dafc8a1d8"
 add_bonds_to_figure(fig, bonds_over_time[0])
 ```
 
+<!-- #region id="a1f5bfee-42b2-45d2-84b9-b2a130a64a6c" -->
 Now, let's build on our plotting functions to animate the motion over time.
+<!-- #endregion -->
 
-```python
+```python id="bf2e88f9-d00a-4cc6-b46b-2eea85a4ea1a"
 def animate_lattice(atoms_over_time, bonds_over_time=None, elements=None, x_range=(-0.5, 3), y_range=(-0.5, 3), z_range=(3, -3), frame_time=500, dt=1e-14, export=False):
     """
     Create a 3D animation of dynamically updating atom positions and bonds.
@@ -1806,8 +1879,8 @@ def animate_lattice(atoms_over_time, bonds_over_time=None, elements=None, x_rang
         Time step in seconds. Default is 1e-14.
 
     export : bool, optional
-        If True, the plot is configured to autosize for exporting to an HTML file using 
-        `fig.write_html("filename.html", auto_play=False)`. If False, the plot is displayed with fixed 
+        If True, the plot is configured to autosize for exporting to an HTML file using
+        `fig.write_html("filename.html", auto_play=False)`. If False, the plot is displayed with fixed
         dimensions (900x700).
 
     Returns:
@@ -1895,9 +1968,11 @@ def animate_lattice(atoms_over_time, bonds_over_time=None, elements=None, x_rang
 
 ```
 
+<!-- #region id="18ce7168-d44a-4105-ba12-f6bac881cd24" -->
 To test this out, we'll mock up a circular motion for the two molecules we visualised earlier.
+<!-- #endregion -->
 
-```python
+```python id="915b2257-9347-42df-a79f-b2edf7200367"
 # Constants
 num_timesteps = 1000
 
@@ -1924,11 +1999,11 @@ for t in range(num_timesteps):
     for i, pos in enumerate(initial_positions):
         # Define the radius of the motion for each molecule
         radius = 0.5 * (i + 1)  # Each molecule has a different radius
-    
+
         # Calculate the center of the circle
         center_x = pos[1]
         center_y = pos[2] - radius  # Shift center to align initial position
-    
+
         # Update position for circular motion
         x = center_x + radius * np.sin(-2 * np.pi * t / num_timesteps)
         y = center_y + radius * np.cos(-2 * np.pi * t / num_timesteps)
@@ -1950,9 +2025,11 @@ for t in range(num_timesteps):
     h2_phi_over_time.append(phi)
 ```
 
+<!-- #region id="9295aced-90c3-4d49-8945-0ec62cce7781" -->
 The previous block of code above simulates circular motion of the centre of mass of two molecules. In order to visualise the atoms and bonds, we have to expand the molecule into its atoms, create the bonds and combine the hydrogen and palladium together into a single array for plotting.
+<!-- #endregion -->
 
-```python
+```python id="4e74929c-15c2-4c0c-a40f-da64f9ad1687"
 h_positions_over_time = expand_diatomic_positions(
     h2_positions_over_time,
     h2_bond_lengths_over_time,
@@ -1965,15 +2042,19 @@ bonds_over_time = create_bonds_over_time(h_positions_over_time)
 all_atoms_over_time = [Hs + Pds for Hs, Pds in zip(h_positions_over_time, pd_positions_over_time)]
 ```
 
+<!-- #region id="de852517" -->
 Below, we're going to run the animation a bit slower than the final that you'll see soon. We slow down the animation bt making a smaller `frame_time=5` - it's the physical time between each animation frame. Later we'll use `frame_time=20`.
+<!-- #endregion -->
 
-```python
+```python id="4c083241-7d2b-42bb-b57b-2c20e35f4b61" outputId="77e58e91-fd4e-4afc-bf13-db32154d1cff"
 animate_lattice(all_atoms_over_time, bonds_over_time,frame_time=5)
 ```
 
+<!-- #region id="128b9baf-073a-4e09-bf43-042681ebe5c9" -->
 We're now in a position to put everything together and visualise $\rm D_2$ gas adsorbing onto a $\rm Pd$ surface.
+<!-- #endregion -->
 
-```python
+```python id="ee0e7246-7708-4cf8-9a16-f0a0c35d9c10"
 def simulate(
     pd_atoms,
     cell_parameters,
@@ -1999,7 +2080,7 @@ def simulate(
     # Make the site dicts that allow us to keep track of what sites are occupied
     bridge_sites, hollow_sites = identify_bridge_and_hollow_sites(surface_pd_atoms)
     atom_to_bridges, bridge_to_atoms, bridge_to_hollows, hollow_to_bridges = construct_site_dictionaries(surface_pd_atoms, bridge_sites, hollow_sites)
-    
+
     # Set the random seed
     rng = np.random.default_rng(seed)
 
@@ -2008,8 +2089,8 @@ def simulate(
 
     # Calculate grid limits
     gas_limits = calculate_gas_limits(pd_atoms, 2.0)
-    
-    # Calculate how many and where the initial gas particles should be taking into account pressure and temperature to 
+
+    # Calculate how many and where the initial gas particles should be taking into account pressure and temperature to
     # give us density and the using the lattice dimensions to determine how big the simulation space should be into which
     # we'll put the particles. It's very likely that at common temperatures and pressures, there will be less than 1 particle
     # in the simulation box. In that case, a single particle is generated in the box probabilistically. We therefore need
@@ -2036,12 +2117,12 @@ def simulate(
     # crystal units per second. Note we assume the cell_parameters are the same in all dimensions
     gas_velocities = generate_gas_velocities(len(inital_gas_positions), gas_temperature, cell_parameters, "D2", D2_mass)
 
-    # Initialise an empty array for holding atoms that have entered a region close to the Pd. These atoms are moved in a special way 
+    # Initialise an empty array for holding atoms that have entered a region close to the Pd. These atoms are moved in a special way
     # as they are adsorbed and so will be taken out of the main moving loop.
     adsorbing_positions_over_time = [[]]
     adsorbing_properties_over_time = [[]]
 
-    # Initialise an empty array for holding atoms that are undergoing dissociation. These atoms are moved in a special way 
+    # Initialise an empty array for holding atoms that are undergoing dissociation. These atoms are moved in a special way
     # as they are dissociated and so will be taken out of the main moving loop and the adsorbing loop.
     dissociating_positions_over_time = [[]]
     dissociating_properties_over_time = [[]]
@@ -2052,14 +2133,14 @@ def simulate(
 
     # Keeps track of the target positions, bond lengths and orientations for molecules that are undergoing dissociation
     dissociation_targets = []
-    
+
     # Create an array that will hold the positions of all Pd atoms over all time.
     pd_positions_over_time = []
 
     for cycle in range(num_iterations - 1):
         # Pd are static so we add the initial Pd atoms to pd_positions_over_time
         pd_positions_over_time.append(surface_pd_atoms)
-        
+
         # Grab the current positions velocities and propeties of all the particles
         current_gas_positions = gas_positions_over_time[-1]
         current_adsorbing_positions = adsorbing_positions_over_time[-1]
@@ -2069,9 +2150,9 @@ def simulate(
         current_dissociating_properties = dissociating_properties_over_time[-1]
         current_gas_velocities = gas_velocities[:] # copy the array
 
-        # Check the density of gas particles. Some might have left the boundary or started bonding, 
+        # Check the density of gas particles. Some might have left the boundary or started bonding,
         # so we might need to inject some more gas particles to be consistent with the gas pressure.
-        # Keep in mind that for typical gas pressures we have <1 particle in our simulation box, so 
+        # Keep in mind that for typical gas pressures we have <1 particle in our simulation box, so
         # we'll likely have to wait several time steps before we generate a new particle if one has left
 
         # Generate all potential gas positions consistent with the target density
@@ -2079,10 +2160,10 @@ def simulate(
         all_potential_gas_velocities = generate_gas_velocities(len(all_potential_gas_positions), gas_temperature, cell_parameters, "D2", D2_mass)
         all_potential_gas_properties =  generate_gas_properties(len(all_potential_gas_positions), D2_gas_bond_length)
 
-        
+
         # Calculate how many more particles are needed to meet the target density
         num_particles_to_inject = max(0, len(all_potential_gas_positions) - len(current_gas_positions))
-        
+
         # If more particles are needed, inject only the required number
         if num_particles_to_inject > 0:
             # Inject the required number of new particles
@@ -2093,8 +2174,8 @@ def simulate(
             current_gas_positions += new_gas_positions
             current_gas_velocities += new_gas_velocities
             current_gas_properties += new_gas_propeties
-        
-        
+
+
         # Create a placeholder for the new positions, velocities and gas properties of the particles after we've moved/adsorbed/dissociated them
         gas_positions_over_time.append([])
         gas_properties_over_time.append([])
@@ -2114,7 +2195,7 @@ def simulate(
                 dissociating_properties_over_time[-1].append(new_dissociating_properties)
 
 
-        # Molecules that are already adsorbing need to undergo their adsorbing motion       
+        # Molecules that are already adsorbing need to undergo their adsorbing motion
         if current_adsorbing_positions:
             for molecule, properties, pd_atom in zip(current_adsorbing_positions, current_adsorbing_properties, bonding_pd_positions):
                 # As the adsorbing proceeds, the position of the center of the gas molecule and bond length and orientation will change
@@ -2152,13 +2233,13 @@ def simulate(
                 # If None is returned for new_gas_position and new_gas_velocity it means particle has left the simulation box
                 # and we have no position or velocity to append in the next time step so the molecule vanishes
                 new_gas_position, new_gas_velcoity = move_gas_atom(position, velocity, dt, gas_limits)
-                
+
                 if(new_gas_position and new_gas_velcoity):
                     # Now check if the newly moved D2 molecule has entered a region where it should start adsorbing.
                     # If a bonding_pd_position is returned then it means this the gas should start adsorbing in the next cycle instead of moving like a gas particle
                     # The adsorb_atop function keeps track of which Pd atoms have already got a D2 molecule bonding with them and reflects any new gas that get close
                     new_gas_position, new_gas_velcoity, bonding_pd_position = adsorb_atop(new_gas_position, new_gas_velcoity, properties["theta"], surface_pd_atoms, bonding_pd_positions)
-                    
+
                     if(bonding_pd_position):
                         # An gas molecule that needs to start adsorbing should be added to the list of atoms that are adsorbing for the next iteration
                         adsorbing_positions_over_time[-1].append(new_gas_position)
@@ -2171,7 +2252,7 @@ def simulate(
                         gas_positions_over_time[-1].append(new_gas_position)
                         gas_velocities.append(new_gas_velcoity)
                         gas_properties_over_time[-1].append(properties) # no change to bond length or orientation in the gas
-    
+
     # Now we must combine the gas molecules and the adsorbing molecules
     molecule_positions_over_time = [gas + adsorbing for gas, adsorbing in zip(gas_positions_over_time, adsorbing_positions_over_time)]
     molecule_properties_over_time = [gas + adsorbing for gas, adsorbing in zip(gas_properties_over_time, adsorbing_properties_over_time)]
@@ -2193,41 +2274,42 @@ def simulate(
     molecules_over_time = expand_diatomic_positions(
                                             molecule_positions_over_time,
                                             molecule_bond_lengths_over_time,
-                                            molecule_theta_over_time, 
+                                            molecule_theta_over_time,
                                             molecule_phi_over_time
                                             )
-    
+
     dissociated_molecules_over_time = expand_diatomic_positions(
                                         dissociating_positions_over_time,
                                         dissociating_bond_lengths_over_time,
-                                        dissociating_theta_over_time, 
+                                        dissociating_theta_over_time,
                                         dissociating_phi_over_time
                                         )
-    
+
     return molecules_over_time, dissociated_molecules_over_time, pd_positions_over_time
 ```
 
-```python
+```python id="3f82fb5c-7956-440d-9dc5-4ccf254d88ad"
 D2_positions_over_time, D_positions_over_time, Pd_positions_over_time = simulate(pd_positions, cell_parameters, num_iterations=1000, dt=5e-14)
 ```
 
-```python
+```python id="51abe8aa-1b1c-4c24-bc1d-18362c662481"
 bonds_over_time = create_bonds_over_time(D2_positions_over_time)
 ```
 
-```python
+```python id="bcb52f2f-1907-4fd1-8b9a-4bea083c6b65"
 all_atoms_over_time = [D2s + Ds + Pds for D2s, Ds, Pds in zip(D2_positions_over_time, D_positions_over_time, Pd_positions_over_time)]
 ```
 
-```python
+```python id="5eaac80b-18ca-48c5-9ef3-7d944991b8f5"
 anim = animate_lattice(all_atoms_over_time, bonds_over_time, frame_time=20, elements=["Pd", "D"], dt=5e-14, export=False)
 ```
 
-```python
+```python id="1e9c010f-2844-4342-9ff5-6e7af4e6675e" outputId="7499acb7-0876-480d-d641-526b33b346c4"
 anim.show()
 # anim.write_html("D2-adsorption-onto-Pd.html", auto_play=False) # Requires "export=True" in animate_lattice
 ```
 
+<!-- #region id="216a6840-1235-47f1-a1df-abb812cafb1b" -->
 ---
 
 ## Appendix: Rotational State Populations for $ \text{H}_2 $ at 300 K
@@ -2265,8 +2347,9 @@ Here we calculates the rotational state populations for $ \text{H}_2 $ at 300 K,
 ### Implementation
 The Python code below calculates the fractional populations and plots the results.
 
+<!-- #endregion -->
 
-```python
+```python id="5e2e13bc-a54e-406c-889c-817a5fb4304f" outputId="5ca72359-58f0-4e87-a31f-d6185023439f"
 import numpy as np
 import matplotlib.pyplot as plt
 
