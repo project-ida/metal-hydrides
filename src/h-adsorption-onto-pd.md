@@ -5,7 +5,7 @@ jupyter:
       extension: .md
       format_name: markdown
       format_version: '1.3'
-      jupytext_version: 1.17.2
+      jupytext_version: 1.19.5
   kernelspec:
     display_name: Python 3 (ipykernel)
     language: python
@@ -34,24 +34,24 @@ This simulation is part of a group of simulations designed to tackle different p
 # RUN THIS IF YOU ARE USING GOOGLE COLAB
 import sys
 import os
-!pip install periodictable
-!pip install --upgrade plotly
+!pip install -q periodictable
+!pip install -q --upgrade --force-reinstall "plotly==6.8.0"
 !git clone https://github.com/project-ida/metal-hydrides.git
 sys.path.insert(0,'/content/metal-hydrides')
 os.chdir('/content/metal-hydrides')
 ```
 
-```python id="bac30ef6-5cbc-48b9-8efc-2228e6e2d1dc" outputId="e9a68161-1c4d-4c70-9eb1-962261779fff"
+```python id="bac30ef6-5cbc-48b9-8efc-2228e6e2d1dc"
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 from itertools import combinations
 from periodictable.formulas import formula as chemical_formula
 import random
-from plotly.offline import init_notebook_mode
 
-# Initialize offline mode for notebooks
-init_notebook_mode(connected=True)
+# Make sure plotly displays properly in colab, notebooks and nbviewer
+import plotly.io as pio
+pio.renderers.default = "notebook_connected+colab"
 ```
 
 ```python id="6cad0ecf-dd4d-4701-9103-0bdba9611cc4"
@@ -174,7 +174,7 @@ pd_positions, cell_parameters, identifiers, bonds = parse_atomic_positions_and_i
 Let's look at the first 10 atomic positions to get a sense of the format - remembering the units are "crystal coordinates".
 <!-- #endregion -->
 
-```python id="b1118c4b-9317-4342-b5e9-4c7e27bb21ea" outputId="94254928-c5d8-4211-9d44-653382de462d"
+```python id="b1118c4b-9317-4342-b5e9-4c7e27bb21ea" outputId="69b6f725-e8f7-4e33-a3a3-b1ea04f5b8cd" colab={"base_uri": "https://localhost:8080/"}
 print("\n".join(map(str, pd_positions[:10])))
 ```
 
@@ -182,7 +182,7 @@ print("\n".join(map(str, pd_positions[:10])))
 We can see the $\rm Pd$ lattice constant $a \approx 3.89 \, Å$ from the "cell parameters" that define the [conventional unit cell](https://en.wikipedia.org/wiki/Unit_cell#Conventional_cell).
 <!-- #endregion -->
 
-```python id="2833e4dc-95f6-487d-8fc2-fbbb5d595937" outputId="41e52f13-1c56-4868-bef2-8eb197e1c5be"
+```python id="2833e4dc-95f6-487d-8fc2-fbbb5d595937" outputId="f5095056-d3de-4764-ebbe-0f37abeb0241" colab={"base_uri": "https://localhost:8080/"}
 print(cell_parameters)
 ```
 
@@ -201,7 +201,7 @@ def angstrom_to_crystal(length_angstrom, cell_parameters):
 Let's check it works by using the lattice constant $a \approx 3.89 \, Å$ and see if it returns 1.
 <!-- #endregion -->
 
-```python id="e5d70aa6-9882-4597-9a18-e217269de43b" outputId="37bcf0a3-b5dc-462d-a51b-7669827d304f"
+```python id="e5d70aa6-9882-4597-9a18-e217269de43b" outputId="109f11c9-d886-4e04-e45a-f24c4d237500" colab={"base_uri": "https://localhost:8080/"}
 angstrom_to_crystal(3.89, cell_parameters)
 ```
 
@@ -421,7 +421,7 @@ def plot_lattice(atom_positions, elements=None, xlim=(-0.5, 2.5), ylim=(-0.5, 3.
 
 ```
 
-```python id="32bd15cd-fa39-4486-92be-b60d2ce55690" outputId="9c5d39e3-64ce-4320-9047-ad6ebd52bdc8"
+```python id="32bd15cd-fa39-4486-92be-b60d2ce55690" outputId="53c63e4f-2e5f-4cf6-a15c-83b715ee26ea" colab={"base_uri": "https://localhost:8080/", "height": 717}
 plot_lattice(pd_positions)
 ```
 
@@ -480,7 +480,7 @@ def calculate_gas_limits(lattice_positions, space_above_surface):
     return {'x': (x_min, x_max), 'y': (y_min, y_max), 'z': (-space_above_surface, z_min)}
 ```
 
-```python id="cdc16a17-6c36-48d5-a77b-fe60f66cd5ef" outputId="734df537-ae72-4fd8-a0ab-0cc1a3f17e71"
+```python id="cdc16a17-6c36-48d5-a77b-fe60f66cd5ef" outputId="b18aa598-572b-4512-9f3e-c1d2a41a2415" colab={"base_uri": "https://localhost:8080/"}
 gas_limits = calculate_gas_limits(pd_positions, 2.0)
 gas_limits
 ```
@@ -539,7 +539,7 @@ def extract_surface_atoms(lattice_positions, species=None):
 surface_pd_atoms = extract_surface_atoms(pd_positions, "Pd")
 ```
 
-```python id="f0110c96-4b1e-4ca4-afca-c949c312cf94" outputId="e77d2e9c-833a-4005-8b2e-ab5cfa1ead83"
+```python id="f0110c96-4b1e-4ca4-afca-c949c312cf94" outputId="e93d39c1-b761-4795-e060-a42e88c7b707" colab={"base_uri": "https://localhost:8080/", "height": 717}
 plot_lattice(surface_pd_atoms)
 ```
 
@@ -551,7 +551,7 @@ plot_lattice(surface_pd_atoms)
 How many gas molecules are going to be present in the simulation box? We first need to get the volume of the box.
 <!-- #endregion -->
 
-```python id="13f1b778-82dc-4978-9a36-63ce0a6be239" outputId="62e9f772-9ddb-4883-d246-d7e21cb2635e"
+```python id="13f1b778-82dc-4978-9a36-63ce0a6be239" outputId="5814d93b-9263-4360-f904-392658e4b220" colab={"base_uri": "https://localhost:8080/"}
 cell_volume = np.abs(np.linalg.det(cell_parameters))
 num_cells_x = gas_limits['x'][1] - gas_limits['x'][0]
 num_cells_y = gas_limits['y'][1] - gas_limits['y'][0]
@@ -565,7 +565,7 @@ print(f"{total_volume} Å³")
 If we take the average number density of air at standard temperature and pressure $n\approx 2.5\times 10^{25} \,  \rm m^{-3}$, then the average number of molecules in the simulation box is going to be on the order of:
 <!-- #endregion -->
 
-```python id="9d48d7a5-bc9b-422d-85dd-5b896f347df0" outputId="aedcd01f-f08b-4c84-e2a4-dff373678a68"
+```python id="9d48d7a5-bc9b-422d-85dd-5b896f347df0" outputId="271e89ac-5ae8-4707-86fb-1c575c05490b" colab={"base_uri": "https://localhost:8080/"}
 2.5e25 * total_volume * 1e-30 # Convert Å^3 to m^3
 ```
 
@@ -684,7 +684,7 @@ def generate_gas_positions(gas_pressure, gas_temperature, gas_limits, cell_param
 Let's check how often the function will actually generate a gas molecules
 <!-- #endregion -->
 
-```python id="33434cb7-9627-49b4-8825-a58474d59b4b" outputId="8e7417ba-21fc-4a40-ca0d-ae62cfca5cdc"
+```python id="33434cb7-9627-49b4-8825-a58474d59b4b" outputId="0223f6dc-41e2-4156-83a7-eb19d3681a8e" colab={"base_uri": "https://localhost:8080/"}
 number_mol = []
 num_experiments = 1000
 pressure  = 1 # bar
@@ -803,7 +803,7 @@ def generate_gas_velocities(num_particles, gas_temperature, cell_parameters, spe
 We're ultimately going to work with deuterium so let's check how fast $\rm D_2$ gas molecules at 25 C are moving. We'll sample 1000 velocities and see what the average is.
 <!-- #endregion -->
 
-```python id="1e3ec367-dde4-4782-bce6-6cf61beb5bde" outputId="0195963a-93bd-48bf-ebc3-2f5b526e63e3"
+```python id="1e3ec367-dde4-4782-bce6-6cf61beb5bde" outputId="35e989d5-a26d-4bf4-b278-e475b56c03db" colab={"base_uri": "https://localhost:8080/"}
 temperature = 25 # C
 D2_mass = chemical_formula("D2").mass*dalton_to_kg
 number_of_velocies = 1000
@@ -988,7 +988,7 @@ and molecules with metal surfaces](https://webcf.waybackmachine.org/web/20240416
 An individual hydrogen molecule can form a chemical bond with an individual palladium atom - producing a so called dihydrogen complex. The result is a Pd-H bond length of 1.67 Å and a lengthening of the molecular H-H bond length from 0.74 Å to 0.864 Å. A visual comparison of these lengths is presented (to scale) below.
 <!-- #endregion -->
 
-```python id="791747b2-7daa-4006-ac71-fd6318f6b37d" outputId="4227afbb-024b-45ec-8d54-99e8be0e908f"
+```python id="791747b2-7daa-4006-ac71-fd6318f6b37d" outputId="091e0569-5613-4869-cebd-10d8e811d9ea" colab={"base_uri": "https://localhost:8080/", "height": 607}
 def draw_bond(ax, pos1, pos2, color='silver', width=2):
     """Draw a bond between two points."""
     ax.plot(
@@ -1323,7 +1323,7 @@ def identify_bridge_and_hollow_sites(surface_pd_atoms):
 Let's check it works
 <!-- #endregion -->
 
-```python id="d23735db-0dd7-4b33-b2c1-6b2e60f19a00" outputId="0e896133-4c0f-49c7-9794-09111e5fdcf9"
+```python id="d23735db-0dd7-4b33-b2c1-6b2e60f19a00" outputId="d864e209-5b64-4971-cd15-53e9f6c8e1bb" colab={"base_uri": "https://localhost:8080/", "height": 717}
 bridge_sites, hollow_sites = identify_bridge_and_hollow_sites(surface_pd_atoms)
 plot_lattice(surface_pd_atoms+bridge_sites+hollow_sites, marker_color_map={"Bridge":"orange", "Hollow":"red"})
 ```
@@ -1424,12 +1424,12 @@ Let's check it works.
 atom_to_bridges, bridge_to_atoms, bridge_to_hollows, hollow_to_bridges = construct_site_dictionaries(surface_pd_atoms, bridge_sites, hollow_sites)
 ```
 
-```python id="a1690080-dcdc-44e4-9084-8c903b89f272" outputId="c6df2ef4-45b1-4537-bf0f-046e24830857"
+```python id="a1690080-dcdc-44e4-9084-8c903b89f272" outputId="04383132-9c70-4e22-f21e-f4ad130b2347" colab={"base_uri": "https://localhost:8080/", "height": 717}
 plot_lattice(surface_pd_atoms + atom_to_bridges[('Pd', 0.5, 0.5, 0.0)] + atom_to_bridges[('Pd', 2.0, 3.0, 0.0)] +
              atom_to_bridges[('Pd', 2.0, 1.0, 0.0)], marker_color_map={"Bridge":"orange"})
 ```
 
-```python id="8ed065fd-6077-4bad-bfb9-17a7cb68e732" outputId="7a6f1ff2-5e3b-41bb-a60b-147eae8efaeb"
+```python id="8ed065fd-6077-4bad-bfb9-17a7cb68e732" outputId="c52b640e-55b3-4075-b050-39689d909f66" colab={"base_uri": "https://localhost:8080/", "height": 717}
 plot_lattice(surface_pd_atoms  + atom_to_bridges[('Pd', 2.0, 3.0, 0.0)] + bridge_to_hollows[atom_to_bridges[('Pd', 2.0, 3.0, 0.0)][0]]
              +[atom_to_bridges[('Pd', 1.0, 1.0, 0.0)][0]] + bridge_to_hollows[atom_to_bridges[('Pd', 1.0, 1.0, 0.0)][0]], marker_color_map={"Bridge":"orange", "Hollow":"red"})
 ```
@@ -1731,7 +1731,7 @@ h_positions_over_time = expand_diatomic_positions(h2_positions_over_time, h2_bon
 We can plot this using `plot_lattice` by just taking the first element of the `expand_h_positions_over_time` array
 <!-- #endregion -->
 
-```python id="0b516596-95d5-4beb-ad7e-ecc278829b88" outputId="840f2ca0-1afd-4f17-dbf2-55591638a8ec"
+```python id="0b516596-95d5-4beb-ad7e-ecc278829b88" outputId="1ebbd921-4e00-4cd1-9d80-eb294505db2a" colab={"base_uri": "https://localhost:8080/", "height": 717}
 fig = plot_lattice(surface_pd_atoms + h_positions_over_time[0])
 fig.show()
 ```
@@ -1839,7 +1839,7 @@ def add_bonds_to_figure(fig, bonds, bond_color='green', bond_width=2):
 
 ```
 
-```python id="95675a0a-139a-42d8-8e39-01abd666fc91" outputId="cee1c4b0-21a3-4f3d-c919-a29dafc8a1d8"
+```python id="95675a0a-139a-42d8-8e39-01abd666fc91" outputId="5ed9c713-2edb-49da-928e-4ed19bbb17b9" colab={"base_uri": "https://localhost:8080/", "height": 717}
 add_bonds_to_figure(fig, bonds_over_time[0])
 ```
 
@@ -2047,7 +2047,7 @@ all_atoms_over_time = [Hs + Pds for Hs, Pds in zip(h_positions_over_time, pd_pos
 Below, we're going to run the animation a bit slower than the final that you'll see soon. We slow down the animation bt making a smaller `frame_time=5` - it's the physical time between each animation frame. Later we'll use `frame_time=20`.
 <!-- #endregion -->
 
-```python id="4c083241-7d2b-42bb-b57b-2c20e35f4b61" outputId="77e58e91-fd4e-4afc-bf13-db32154d1cff"
+```python id="4c083241-7d2b-42bb-b57b-2c20e35f4b61" outputId="549e3160-a3bd-41d4-b473-510c77841bf2" colab={"base_uri": "https://localhost:8080/", "height": 717}
 animate_lattice(all_atoms_over_time, bonds_over_time,frame_time=5)
 ```
 
@@ -2305,7 +2305,7 @@ all_atoms_over_time = [D2s + Ds + Pds for D2s, Ds, Pds in zip(D2_positions_over_
 anim = animate_lattice(all_atoms_over_time, bonds_over_time, frame_time=20, elements=["Pd", "D"], dt=5e-14, export=False)
 ```
 
-```python id="1e9c010f-2844-4342-9ff5-6e7af4e6675e" outputId="7499acb7-0876-480d-d641-526b33b346c4"
+```python id="1e9c010f-2844-4342-9ff5-6e7af4e6675e" outputId="486cd73d-485b-4e81-bf4a-02e000d0d6b5" colab={"base_uri": "https://localhost:8080/", "height": 717}
 anim.show()
 # anim.write_html("D2-adsorption-onto-Pd.html", auto_play=False) # Requires "export=True" in animate_lattice
 ```
@@ -2350,7 +2350,7 @@ The Python code below calculates the fractional populations and plots the result
 
 <!-- #endregion -->
 
-```python id="5e2e13bc-a54e-406c-889c-817a5fb4304f" outputId="5ca72359-58f0-4e87-a31f-d6185023439f"
+```python id="5e2e13bc-a54e-406c-889c-817a5fb4304f" outputId="9237d139-e138-4b60-b626-d5411ec54e22" colab={"base_uri": "https://localhost:8080/", "height": 566}
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -2390,5 +2390,9 @@ plt.xlabel("Rotational Quantum Number (J)")
 plt.ylabel("Fractional Population")
 plt.grid(True)
 plt.show()
+
+```
+
+```python id="5uXNQnsYZvpB"
 
 ```
